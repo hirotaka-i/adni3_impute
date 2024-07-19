@@ -1,1 +1,2 @@
-# adni3_impute
+# ADNI3 Imputataion preparation and some after imputation analysis
+ADNI3 is genotyped with Illumina GSA array. Provided with the two sets at LONI. We combined them together and split those with European ancestry, do some QC and impute it with Michigan Imputation Server. After Imputation, we also conducted some post-imputation analysis.
