@@ -62,3 +62,5 @@ for PRS in ${STUDIES[@]}; do
     SCORE_FILE=variants_eur_norm_multi_${PRS}.score
     plink2 --pfile variants_eur_norm_multi --score $SCORE_FILE list-variants --out variants_eur_norm_multi_${PRS}
 done
+
+plink2 --pfile variants_eur_norm_multi --export A include-alt --out variants_eur_norm_multi
