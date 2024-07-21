@@ -163,9 +163,14 @@ cython_debug/
 
 .DS_Store
 work/*
+work2/*
+prs/*
+impute_eur_unzip/*
+impute_eur/*
 PLINK_set1/*
 PLINK_set2/*
 impute_eur/*
 FinalReport_example
 ADNI3_merged*
 adni3_common*
+export*

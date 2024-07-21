@@ -1,5 +1,5 @@
 module load R
-Rscript --vanilla get_common_rs.r
+Rscript --vanilla code/get_common_rs.r
 
 mkdir -p work
 plink2 --bfile PLINK_set2/ADNI3_PLINK_FINAL_2nd --extract adni3_common_var.txt --make-bed --out work/ADNI3_2nd_set
@@ -15,6 +15,7 @@ awk '{ if (($2 == "A" && $3 == "T") || ($2 == "T" && $3 == "A") || ($2 == "C" &&
 plink --bfile $FILENAME --exclude palindromic_snps.txt --make-bed --out ${FILENAME}_no_palindromic
 FILENAME=${FILENAME}_no_palindromic
 
+# Heterozygosity
 plink --bfile $FILENAME --geno 0.01 --maf 0.05 --indep-pairwise 50 5 0.5 --out pruning
 plink --bfile $FILENAME --extract pruning.prune.in --make-bed --out pruned_data
 plink --bfile pruned_data --het --out prunedHet
@@ -26,7 +27,6 @@ plink --bfile $FILENAME --remove all_outliers.txt --make-bed --out ${FILENAME}_a
 FILENAME=${FILENAME}_after_heterozyg
 plink --bfile $FILENAME --mind 0.05 --make-bed --out ${FILENAME}_after_call_rate # no missing rate > 0.05
 FILENAME=${FILENAME}_after_call_rate
-FILENAME=ADNI3_merged_no_palindromic_after_heterozyg_after_call_rate
 
 # update variant IDs
 plink --bfile $FILENAME --update-name ../adni3_common_ID_rsID_mapping.txt --make-bed --out ${FILENAME}_rename
@@ -41,28 +41,16 @@ plink --bfile $FILENAME --flip hapmap3_bin_snplis-merge.missnp --make-bed --out 
 plink --bfile $FILENAME3 --bmerge ../../../HAPMAP_hg19_new --out hapmap3_bin_snplis --make-bed
 plink --bfile $FILENAME3 --exclude hapmap3_bin_snplis-merge.missnp --out $FILENAME4 --make-bed
 plink --bfile $FILENAME4 --bmerge ../../../HAPMAP_hg19_new --out hapmap3_bin_snplis --make-bed
-plink --bfile hapmap3_bin_snplis --geno 0.01 --out pca --make-bed --pca 4
+plink --bfile hapmap3_bin_snplis --geno 0.01 --maf 0.05 --indep-pairwise 50 5 0.5 --out hapmap3_bin_snplis_pruning
+plink --bfile hapmap3_bin_snplis --extract pruning.prune.in --make-bed --out hapmap3_bin_snplis_pruned
+plink --bfile hapmap3_bin_snplis_pruned --geno 0.01 --out pca --make-bed --pca 10
 
-# then add some names here and there
-wget https://raw.githubusercontent.com/neurogenetics/GWAS-pipeline/master/ancestry_comparison/eur_add.txt
-wget https://raw.githubusercontent.com/neurogenetics/GWAS-pipeline/master/ancestry_comparison/afri_add.txt
-wget https://raw.githubusercontent.com/neurogenetics/GWAS-pipeline/master/ancestry_comparison/asia_add.txt
-wget https://raw.githubusercontent.com/neurogenetics/GWAS-pipeline/master/ancestry_comparison/PCA_in_R.R
+# Ancestry comparison
+python3 ../code/check_adni_pop.py
 
-grep "EUROPE" pca.eigenvec > eur.txt
-grep "ASIA" pca.eigenvec > asia.txt
-grep "AFRICA" pca.eigenvec > afri.txt
-grep -v -f eur.txt pca.eigenvec | grep -v -f asia.txt | grep -v -f afri.txt > new_samples.txt
-cut -d " " -f 3 $FILENAME.fam > new_samples_add.txt
-paste new_samples_add.txt new_samples.txt > new_samples2.txt
-paste eur_add.txt eur.txt > euro.txt
-paste asia_add.txt asia.txt > asiao.txt
-paste afri_add.txt afri.txt > afrio.txt
-cat new_samples2.txt euro.txt asiao.txt afrio.txt > pca.eigenvec2
-module load R
-Rscript --no-save PCA_in_R.R
-plink --bfile $FILENAME --keep PCA_filtered_europeans.txt --make-bed --out  ${FILENAME}_eur
-cat PCA_filtered_asians.txt PCA_filtered_africans.txt PCA_filtered_mixed_race.txt > hapmap_outliers.txt
+# Europeans only
+plink --bfile $FILENAME --keep genetic_ancestry_EUROPE.txt --make-bed --out  ${FILENAME}_eur
+cat genetic_ancestry_ASIA.txt genetic_ancestry_AFRICA.txt genetic_ancestry_ADMIX.txt > hapmap_outliers.txt
 
 # relatedness
 FILENAME=${FILENAME}_eur
@@ -77,16 +65,27 @@ FILENAME=${FILENAME}_relatedness
 plink --bfile $FILENAME --test-mishap --out missing_hap
 awk '{if ($8 <= 0.0001) print $9 }' missing_hap.missing.hap > missing_haps_1E4.txt
 sed 's/|/\n/g' missing_haps_1E4.txt > missing_haps_1E4_final.txt
-plink --bfile $FILENAME --exclude missing_haps_1E4_final.txt --make-bed --out ${FILENAME}_missing2
+plink --bfile $FILENAME --exclude missing_haps_1E4_final.txt --make-bed --out ${FILENAME}_mishap
 
 # Hardy-Weinberg equilibrium
-FILENAME=${FILENAME}_missing2
+FILENAME=${FILENAME}_mishap
 plink --bfile $FILENAME --hwe 1e-4 --out ${FILENAME}_hwe --make-bed
 
 
-# Final Prep for MIchigan Imputation Server
+
+
+# eur only pcs
 FILENAME=${FILENAME}_hwe
-plink --bfile ${FILENAME} --freq --out ${FILENAME}
+plink --bfile $FILENAME --geno 0.01 --maf 0.05 --indep-pairwise 50 5 0.5 --out pruning_eur
+plink --bfile $FILENAME --extract pruning_eur.prune.in --make-bed --out pruned_data_eur
+plink --bfile pruned_data_eur --pca 10 --out pca_eur
+python ../code/check_adni_pop_eur.py
+
+
+
+
+# Final Prep for MIchigan Imputation Server
+plink --bfile ${FILENAME} --freq --out ${FILENAME} 
 wget http://www.well.ox.ac.uk/~wrayner/tools/HRC-1000G-check-bim-v4.2.7.zip
 wget ftp://ngs.sanger.ac.uk/production/hrc/HRC.r1-1/HRC.r1-1.GRCh37.wgs.mac5.sites.tab.gz
 gunzip HRC.r1-1.GRCh37.wgs.mac5.sites.tab.gz
@@ -106,13 +105,3 @@ for chnum in {1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23};
   do
 	vcf-sort ${FILENAME}$chnum.vcf | bgzip -c >  pre_impute_${FILENAME}_$chnum.vcf.gz
 done
-
-cd ../
-python check_adni_pop.py
-
-# After imputation
-mkdir -p impute_eur
-cd impute_eur
-curl -sL https://imputationserver.sph.umich.edu/get/3586009/c0ddbc78ac54e9a0f2abc33f0da51b92a66ec83c7c3bbb30b49f4ed14cdc3aca | bash
-curl -sL https://imputationserver.sph.umich.edu/get/3586013/dd1a26ecdd962b9b3cb8e8ab9dc72e7392172f0c0506022fa527b93b2f3b5fc0 | bash
-curl -sL https://imputationserver.sph.umich.edu/get/3586015/2b287de3582cc5fe2483f3bf448dee8911a1d3f9b1190e9cf6157081b97aeb76 | bash
